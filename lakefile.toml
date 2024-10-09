@@ -1,0 +1,10 @@
+name = "formal_rewrite"
+version = "0.1.0"
+defaultTargets = ["formal_rewrite"]
+
+[[lean_lib]]
+name = "FormalRewrite"
+
+[[lean_exe]]
+name = "formal_rewrite"
+root = "Main"
