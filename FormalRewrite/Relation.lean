@@ -7,30 +7,28 @@ A relation is just a binary predicate over some type
 def Relation (A: Type) := A -> A -> Prop
 
 class Reflexive (P: Relation A) where
-  refl: P a a
+  refl: forall {a: A}, P a a
 
 def Relation.refl {A: Type} {P: Relation A} [inst: Reflexive P]:
-  forall (a: A), P a a := fun _a => inst.refl
+  forall {a: A}, P a a := inst.refl
 
 
 class Antisymmetric (P: Relation A) where
-  anti: P a b -> P b a -> a = b
+  anti: forall {a b: A}, P a b -> P b a -> a = b
 
 def Relation.anti {A: Type} {P: Relation A} [inst: Antisymmetric P]:
-  forall {a b: A}, P a b -> P b a -> a = b :=
-    fun Hab Hba => inst.anti Hab Hba
+  forall {a b: A}, P a b -> P b a -> a = b := inst.anti
 
 
 class Transitive (P: Relation A) where
-  trans: P a b -> P b c -> P a c
+  trans: forall {a b c: A}, P a b -> P b c -> P a c
 
 def Relation.trans {A: Type} {P: Relation A} [inst: Transitive P]:
-  forall {a b c: A}, P a b -> P b c -> P a c :=
-    fun Hab Hbc => inst.trans Hab Hbc
+  forall {a b c: A}, P a b -> P b c -> P a c := inst.trans
 
 
 class Symmetric (P: Relation A) where
-  symm: P a b -> P b a
+  symm: forall {a b: A}, P a b -> P b a
 
 def Relation.symm {A: Type} {P: Relation A} [inst: Symmetric P]:
   forall {a b: A}, P a b -> P b a := inst.symm
@@ -52,7 +50,7 @@ def Relation.inv (P: Relation A): P a b -> Inverse P b a:= Inverse.inv
 The defintion of a sub relation
 -/
 class SubRel (P: Relation A) (Q: Relation A): Prop where
-  inclusion: forall {a b}, P a b -> Q a b
+  inclusion: forall {a b: A}, P a b -> Q a b
 
 notation: 60 P " sub_rel " Q => SubRel P Q
 
