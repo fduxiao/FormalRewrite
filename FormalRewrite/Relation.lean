@@ -124,11 +124,11 @@ instance: Reflexive (RCl P) where
   refl := RCl.refl
 
 instance [P sub_rel R] [Reflexive R]: RCl P sub_rel R where
-  inclusion {a b} Hcl := by
-    cases Hcl
-    case inclusion H =>
+  inclusion {a b} H := by
+    cases H
+    case inclusion Hab =>
       apply P.super
-      apply H
+      apply Hab
     case refl => apply R.refl
 
 
@@ -146,11 +146,11 @@ instance: Transitive (TCl P) where
   trans := TCl.trans
 
 instance [P sub_rel R] [Transitive R]: TCl P sub_rel R where
-  inclusion {a b} Hcl := by
-    induction Hcl
-    case inclusion H =>
+  inclusion {a b} H := by
+    induction H
+    case inclusion Hab =>
       apply P.super
-      apply H
+      apply Hab
     case trans Hab Hbc =>
       apply R.trans
       apply Hab
@@ -171,11 +171,11 @@ instance: Symmetric (SCl P) where
   symm := SCl.symm
 
 instance [P sub_rel R] [Symmetric R]: SCl P sub_rel R where
-  inclusion {a b} Hcl := by
-    induction Hcl
-    case inclusion H =>
+  inclusion {a b} H := by
+    induction H
+    case inclusion Hab =>
       apply P.super
-      apply H
+      apply Hab
     case symm Hab =>
       apply R.symm
       apply Hab
