@@ -110,17 +110,20 @@ end RelEq
 end
 
 
-inductive ReflClosure (P: Relation A): Relation A where
-  | inclusion: P a b -> ReflClosure P a b
-  | refl: ReflClosure P a a
+/---
+Reflexive closure
+-/
+inductive RCl (P: Relation A): Relation A where
+  | inclusion: P a b -> RCl P a b
+  | refl: RCl P a a
 
-instance: P sub_rel ReflClosure P where
-  inclusion := ReflClosure.inclusion
+instance: P sub_rel RCl P where
+  inclusion := RCl.inclusion
 
-instance: Reflexive (ReflClosure P) where
-  refl := ReflClosure.refl
+instance: Reflexive (RCl P) where
+  refl := RCl.refl
 
-instance [P sub_rel R] [Reflexive R]: ReflClosure P sub_rel R where
+instance [P sub_rel R] [Reflexive R]: RCl P sub_rel R where
   inclusion {a b} Hcl := by
     cases Hcl
     case inclusion H =>
@@ -129,17 +132,20 @@ instance [P sub_rel R] [Reflexive R]: ReflClosure P sub_rel R where
     case refl => apply R.refl
 
 
-inductive TransitiveClosure (P: Relation A): Relation A where
-  | inclusion: P a b -> TransitiveClosure P a b
-  | trans: TransitiveClosure P a b -> TransitiveClosure P b c -> TransitiveClosure P a c
+/--
+Transitive closure
+-/
+inductive TCl (P: Relation A): Relation A where
+  | inclusion: P a b -> TCl P a b
+  | trans: TCl P a b -> TCl P b c -> TCl P a c
 
-instance: P sub_rel TransitiveClosure P where
-  inclusion := TransitiveClosure.inclusion
+instance: P sub_rel TCl P where
+  inclusion := TCl.inclusion
 
-instance: Transitive (TransitiveClosure P) where
-  trans := TransitiveClosure.trans
+instance: Transitive (TCl P) where
+  trans := TCl.trans
 
-instance [P sub_rel R] [Transitive R]: TransitiveClosure P sub_rel R where
+instance [P sub_rel R] [Transitive R]: TCl P sub_rel R where
   inclusion {a b} Hcl := by
     induction Hcl
     case inclusion H =>
@@ -151,17 +157,20 @@ instance [P sub_rel R] [Transitive R]: TransitiveClosure P sub_rel R where
       apply Hbc
 
 
-inductive SymmetricClosure (P: Relation A): Relation A where
-  | inclusion: P a b -> SymmetricClosure P a b
-  | symm: SymmetricClosure P a b -> SymmetricClosure P b a
+/--
+Symmetric closure
+-/
+inductive SCl (P: Relation A): Relation A where
+  | inclusion: P a b -> SCl P a b
+  | symm: SCl P a b -> SCl P b a
 
-instance: P sub_rel SymmetricClosure P where
-  inclusion := SymmetricClosure.inclusion
+instance: P sub_rel SCl P where
+  inclusion := SCl.inclusion
 
-instance: Symmetric (SymmetricClosure P) where
-  symm := SymmetricClosure.symm
+instance: Symmetric (SCl P) where
+  symm := SCl.symm
 
-instance [P sub_rel R] [Symmetric R]: SymmetricClosure P sub_rel R where
+instance [P sub_rel R] [Symmetric R]: SCl P sub_rel R where
   inclusion {a b} Hcl := by
     induction Hcl
     case inclusion H =>
