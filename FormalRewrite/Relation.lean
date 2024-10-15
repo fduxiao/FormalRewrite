@@ -1,3 +1,5 @@
+import FormalRewrite.Axioms
+
 /-!
 # Relations
 
@@ -87,23 +89,23 @@ theorem sub_equiv: forall {A: Type} {P Q: Relation A},
   . apply s1.inclusion
   . apply s2.inclusion
 
-
-namespace RelEq
-
-axiom rel_eq: forall {A: Type} {P Q: Relation A},
-  P = Q <-> forall (a b: A), P a b <-> Q a b
+theorem rel_eq: forall {A: Type} {P Q: Relation A}, (forall x y: A, P x y <-> Q x y) -> P = Q := by
+  intros A P Q H
+  apply funext
+  intros x
+  apply funext
+  intros y
+  apply propext
+  apply H
 
 instance: forall {A: Type}, Antisymmetric (SubRel (A := A)) where
   anti := by
     intros P Q s1 s2
-    apply rel_eq.mpr
+    apply rel_eq
     intros a b
     apply Iff.intro
     . apply s1.inclusion
     . apply s2.inclusion
-
-
-end RelEq
 
 end
 
