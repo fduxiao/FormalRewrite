@@ -6,7 +6,7 @@ import FormalRewrite.Axioms
 A relation is just a binary predicate over some type
 -/
 
-def Relation (A: Type) := A -> A -> Prop
+abbrev Relation (A: Type) := A -> A -> Prop
 
 class Reflexive (P: Relation A) where
   refl: forall {a: A}, P a a
@@ -56,8 +56,8 @@ class SubRel (P: Relation A) (Q: Relation A): Prop where
 
 notation: 60 P " sub_rel " Q => SubRel P Q
 
-def Relation.super {A: Type} {P: Relation A} {Q: Relation A}
-  [inst: P sub_rel Q]: forall {a b: A}, P a b -> Q a b :=
+def Relation.inclusion {A: Type} {P: Relation A} {Super: Relation A}
+  [inst: P sub_rel Super]: forall {a b: A}, P a b -> Super a b :=
     inst.inclusion
 
 /-!
@@ -65,24 +65,26 @@ def Relation.super {A: Type} {P: Relation A} {Q: Relation A}
 -/
 section
 
-instance: SubRel P P where
+instance sub_rel_refl: P sub_rel P where
   inclusion := id
 
 instance: forall {A: Type}, Reflexive (SubRel (A := A)) where
-  refl {P} := SubRel.mk P.super
+  refl := by
+    intros P
+    apply sub_rel_refl
 
 
 instance: forall {A: Type}, Transitive (SubRel (A := A)) where
   trans {P Q R} {s1 s2} := by
     apply SubRel.mk
     intros a b H
-    apply Q.super
-    apply P.super
+    apply Q.inclusion
+    apply P.inclusion
     apply H
 
 
-theorem sub_equiv: forall {A: Type} {P Q: Relation A},
-  [SubRel P Q] -> [SubRel Q P] -> forall {a b: A}, P a b <-> Q a b := by
+theorem sub_rel_equiv: forall {A: Type} {P Q: Relation A},
+  (P sub_rel Q) -> (Q sub_rel P) -> forall {a b: A}, P a b <-> Q a b := by
   intros A P Q s1 s2
   intros a b
   constructor
@@ -110,6 +112,139 @@ instance: forall {A: Type}, Antisymmetric (SubRel (A := A)) where
 end
 
 
+/-!
+The next thing is to prove what is a closure.
+-/
+section Closure
+
+abbrev RelationOp (A: Type) := Relation A -> Relation A
+abbrev RelationPred (A: Type) := Relation A -> Prop
+
+/-!
+The closure fo each type is clear.
+-/
+class Closure {A: Type} (Pred: outParam (RelationPred A)) (P: outParam (Relation A)) (C: Relation A) where
+  inclusion: P sub_rel C
+  pred: Pred C
+  least: forall {Q: Relation A}, Pred Q -> (P sub_rel Q) -> C sub_rel Q
+
+
+/-!
+We instantly have the following.
+-/
+instance {A: Type} {P C: Relation A} {Pred: RelationPred A} [inst: Closure Pred P C]:
+  P sub_rel C := inst.inclusion
+
+instance cl_cl_sub {A: Type} {Pred: RelationPred A} {P: Relation A} {C1 C2: Relation A}
+  [inst1: Closure Pred P C1] [inst2: Closure Pred P C2]: C1 sub_rel C2 where
+    inclusion := by
+      intros a b
+      let sub := @inst1.least C2 inst2.pred inst2.inclusion
+      apply sub.inclusion
+
+
+theorem cl_unique: forall {A: Type} {Pred: RelationPred A} {P: Relation A} {C1 C2: Relation A}
+  [Closure Pred P C1] [Closure Pred P C2], C1 = C2 := by
+  intros A Pred P C1 C2 inst1 inst2
+  apply rel_eq
+  apply sub_rel_equiv
+  . /- C1 sub_rel C2 -/
+    apply @cl_cl_sub A Pred P C1 C2 inst1 inst2
+  . /- C2 sub_rel C1 -/
+    apply @cl_cl_sub A Pred P C2 C1 inst2 inst1
+
+/-!
+We can also define a closure operator.
+-/
+class ClosureOp {A: Type} (Pred: outParam (RelationPred A)) (Cl: outParam (RelationOp A)) where
+  close (P: Relation A): Closure Pred P (Cl P)
+  closed {P: Relation A} := close P
+  inclusion {P: Relation A} := closed.inclusion (P := P)
+  pred {P: Relation A} := closed.pred (P := P)
+  least {P Q: Relation A} := closed.least (P := P) (Q := Q)
+
+
+def RelationOp.close {A: Type} (Cl: RelationOp A) (P: Relation A) {Pred: RelationPred A}
+  [inst: ClosureOp Pred Cl] := inst.close P
+
+def RelationOp.closed {A: Type} (Cl: RelationOp A) {P: Relation A} {Pred: RelationPred A}
+  [inst: ClosureOp Pred Cl] := inst.close P
+
+/-!
+Then, the `Closure` instances are defined as follows.
+-/
+instance {A: Type} {Pred: RelationPred A} (Cl: RelationOp A) [inst: ClosureOp Pred Cl]
+  (P: Relation A): Closure Pred P (Cl P) := inst.closed
+
+
+instance {A: Type} {Pred: RelationPred A} {Cl: RelationOp A} [inst: ClosureOp Pred Cl] {P: Relation A}:
+  P sub_rel (Cl P) := (inst.closed).inclusion
+
+instance cl_op_cl_op_sub {A: Type} {Pred: RelationPred A} {C1 C2: RelationOp A}
+  [inst1: ClosureOp Pred C1] [inst2: ClosureOp Pred C2] {P: Relation A}: C1 P sub_rel C2 P where
+    inclusion := by
+      intros a b
+      let sub := @inst1.least P (C2 P) inst2.pred inst2.inclusion
+      apply sub.inclusion
+
+instance cl_mono {A: Type} {Pred: RelationPred A} {Cl: RelationOp A} [inst: ClosureOp Pred Cl]
+  {P Q: Relation A} [r1: P sub_rel Q]: Cl P sub_rel Cl Q where
+  inclusion := by
+    have r2: Q sub_rel Cl Q := inst.inclusion
+    have r3: P sub_rel Cl Q := Relation.trans r1 r2
+    let H := @inst.least P (Cl Q) inst.pred r3
+    intros a b
+    apply H.inclusion
+
+theorem rel_op_eq: forall {A: Type} {C1 C2: RelationOp A},
+  (forall {P: Relation A}, C1 P = C2 P) -> C1 = C2 := by
+  intros A C1 C2 H
+  apply funext
+  apply H
+
+theorem cl_op_unique: forall {A: Type} {Pred: RelationPred A} (C1 C2: RelationOp A),
+  [ClosureOp Pred C1] -> [ClosureOp Pred C2] -> C1 = C2 := by
+  intros A pred C1 C2 inst1 inst2
+  apply rel_op_eq
+  intros P
+  apply rel_eq
+  apply sub_rel_equiv
+  . apply @cl_op_cl_op_sub A pred C1 C2 inst1 inst2
+  . apply @cl_op_cl_op_sub A pred C2 C1 inst2 inst1
+
+/-!
+Then, it is reasonable to define the following.
+-/
+
+def Relation.closed {A: Type} {Pred: RelationPred A} {Cl: RelationOp A} [inst: ClosureOp Pred Cl]
+  {P: Relation A} := inst.close P
+
+def Relation.pred {A: Type} {Pred: RelationPred A} {Cl: RelationOp A} [inst: ClosureOp Pred Cl]
+  {P: Relation A}: Pred (Cl P) := inst.pred
+
+def Relation.least {A: Type} {Pred: RelationPred A} (Cl: RelationOp A) [inst: ClosureOp Pred Cl]
+  {P: Relation A}: forall {Q: Relation A}, Pred Q -> (P sub_rel Q) -> (Cl P sub_rel Q) := inst.least
+
+
+/-!
+We are going to deal with a closure `Cl` with respect to `Pred`
+-/
+variable {A: Type}
+variable {P: Relation A}
+variable {Pred: RelationPred A}
+variable {Cl: RelationOp A}
+variable [inst: ClosureOp Pred Cl]
+
+instance cl_cl_sub_cl: Cl (Cl P) sub_rel (Cl P) := inst.least (P := Cl P) (Q := Cl P) inst.pred Relation.refl
+
+theorem cl_cl_is_cl {Cl: RelationOp A} [inst: ClosureOp Pred Cl]: Cl (Cl P) = Cl P := by
+  apply rel_eq
+  apply sub_rel_equiv
+  . apply cl_cl_sub_cl
+  . apply @inst.inclusion
+end Closure
+
+
 /---
 Reflexive closure
 -/
@@ -117,19 +252,26 @@ inductive RCl (P: Relation A): Relation A where
   | inclusion: P a b -> RCl P a b
   | refl: RCl P a a
 
-instance: P sub_rel RCl P where
-  inclusion := RCl.inclusion
+instance RCl.close {A: Type} (P: Relation A): Closure Reflexive P (RCl P) where
+  inclusion := SubRel.mk RCl.inclusion
+  pred := Reflexive.mk RCl.refl
+  least := by
+    intros Q inst sub
+    apply SubRel.mk
+    intros a b H
+    cases H
+    case inclusion Hab =>
+      apply P.inclusion
+      apply Hab
+    case refl => apply inst.refl
+
+
+instance {A: Type}: ClosureOp Reflexive (RCl (A := A)) where
+  close := RCl.close
 
 instance: Reflexive (RCl P) where
   refl := RCl.refl
 
-instance [P sub_rel R] [Reflexive R]: RCl P sub_rel R where
-  inclusion {a b} H := by
-    cases H
-    case inclusion Hab =>
-      apply P.super
-      apply Hab
-    case refl => apply R.refl
 
 theorem rcl_ab_or_eq {A: Type} {P: Relation A}:
   forall {a b: A}, RCl P a b -> P a b ∨ a = b := by
@@ -150,22 +292,29 @@ inductive TCl (P: Relation A): Relation A where
   | inclusion: P a b -> TCl P a b
   | trans: TCl P a b -> TCl P b c -> TCl P a c
 
-instance: P sub_rel TCl P where
-  inclusion := TCl.inclusion
+instance TCl.close {A: Type} (P: Relation A): Closure Transitive P (TCl P) where
+  inclusion := SubRel.mk TCl.inclusion
+  pred := Transitive.mk TCl.trans
+  least := by
+    intros Q sub inst
+    apply SubRel.mk
+    intros a b H
+    induction H
+    case inclusion Hab =>
+      apply P.inclusion
+      apply Hab
+    case trans Hab Hbc =>
+      apply Q.trans
+      apply Hab
+      apply Hbc
+
+
+instance {A: Type}: ClosureOp Transitive (TCl (A := A)) where
+  close := TCl.close
+
 
 instance: Transitive (TCl P) where
   trans := TCl.trans
-
-instance [P sub_rel R] [Transitive R]: TCl P sub_rel R where
-  inclusion {a b} H := by
-    induction H
-    case inclusion Hab =>
-      apply P.super
-      apply Hab
-    case trans Hab Hbc =>
-      apply R.trans
-      apply Hab
-      apply Hbc
 
 
 instance [Reflexive P]: Reflexive (TCl P) where
@@ -179,7 +328,7 @@ instance [Transitive P]: Transitive (RCl P) where
     case inclusion Hab =>
       cases H2
       case inclusion Hbc =>
-        apply P.super
+        apply P.inclusion
         apply P.trans Hab Hbc
       case refl =>
         apply RCl.inclusion
@@ -189,15 +338,42 @@ instance [Transitive P]: Transitive (RCl P) where
 
 
 /--
-Reflexive and Transitive Closure
+`Reflexive` and `Transitive` predicate
+-/
+def RTPred {A: Type}: RelationPred A := fun (P: Relation A) => Reflexive P ∧ Transitive P
+
+/--
+`Reflexive` and `Transitive` Closure
 -/
 inductive RTCl (P: Relation A): Relation A where
   | inclusion: P a b -> RTCl P a b
   | refl: RTCl P a a
   | trans: RTCl P a b -> RTCl P b c -> RTCl P a c
 
-instance: P sub_rel RTCl P where
-  inclusion := RTCl.inclusion
+
+instance RTCl.close (P: Relation A): Closure RTPred P (RTCl P) where
+  inclusion := SubRel.mk RTCl.inclusion
+  pred := by
+    constructor
+    . apply Reflexive.mk
+      apply RTCl.refl
+    . apply Transitive.mk
+      apply RTCl.trans
+  least := by
+    intros Q inst sub
+    let inst_refl := inst.left
+    let inst_trans := inst.right
+    apply SubRel.mk
+    intros a b H
+    induction H
+    case inclusion Hab => apply P.inclusion Hab
+    case refl => apply Q.refl
+    case trans Hab Hbc => apply Q.trans Hab Hbc
+
+
+instance rt_cl_op {A: Type}: ClosureOp RTPred (RTCl (A := A)) where
+  close := RTCl.close
+
 
 instance: Reflexive (RTCl P) where
   refl := RTCl.refl
@@ -205,50 +381,85 @@ instance: Reflexive (RTCl P) where
 instance: Transitive (RTCl P) where
   trans := RTCl.trans
 
-instance [P sub_rel Q] [Reflexive Q] [Transitive Q]: RTCl P sub_rel Q where
-  inclusion {a b} H := by
-    induction H
-    case inclusion Hab => apply P.super Hab
-    case refl => apply Q.refl
-    case trans Hab Hbc =>
-      apply Q.trans Hab Hbc
 
-
-/--
-The reflexive and transitive closure is the
-reflexive closure of the transitive closure.
+/-!
+Then we prove the equivalence between RTCl P, RCl (TCl P) and TCl (RCl P)
 -/
-instance: RTCl P sub_rel RCl (TCl P) where
-  inclusion {a b} H:= by
-    induction H
-    case inclusion Hab =>
-      apply RCl.inclusion
-      apply TCl.inclusion
-      apply Hab
-    case refl =>
-      apply RCl.refl
-    case trans Hab Hac =>
-      apply (RCl (TCl P)).trans Hab Hac
+abbrev RTCl2 (P: Relation A) := RCl (TCl P)
+
+instance RTCl2.close (P: Relation A): Closure RTPred P (RTCl2 P) where
+  inclusion := by
+    apply SubRel.mk
+    intros a b H
+    apply (TCl P).inclusion
+    apply P.inclusion
+    apply H
+  pred := by
+    constructor
+    . /- Reflexive -/
+      apply Reflexive.mk
+      intros a
+      apply Relation.refl
+    . /- Transitive -/
+      apply Transitive.mk
+      intros a b c
+      apply Relation.trans
+  least := by
+    intros Q inst sub
+    let inst_refl := inst.left
+    let inst_trans := inst.right
+    apply (RCl.close (TCl P)).least inst_refl
+    apply (TCl.close P).least inst_trans
+    exact sub
 
 
-instance: RCl P sub_rel RTCl P where
-  inclusion {a b} HR := by
-    apply (RCl P).super HR
+instance rt2_cl_op {A: Type}: ClosureOp RTPred (RTCl2 (A := A)) where
+  close := RTCl2.close
 
-instance: TCl P sub_rel RTCl P where
-  inclusion {a b} HT := by
-    apply (TCl P).super HT
+theorem rt2_eq_rt: @RTCl2 = @RTCl := by
+  apply funext
+  intros A
+  let H := @cl_op_unique A RTPred RTCl2 RTCl rt2_cl_op rt_cl_op
+  apply H
 
-instance: RCl (TCl P) sub_rel RTCl P where
-  inclusion {a b} HRT:= by
-    cases HRT
-    case inclusion HT =>
-      cases HT
-      case inclusion H => apply P.super H
-      case trans Hab Hbc =>
-        apply (TCl P).super
-        apply (TCl P).trans Hab Hbc
-    case refl => apply (RTCl P).refl
+
+abbrev RTCl3 (P: Relation A) := TCl (RCl P)
+
+instance RTCl3.close (P: Relation A): Closure RTPred P (RTCl3 P) where
+  inclusion := by
+    apply SubRel.mk
+    intros a b H
+    apply (TCl P).inclusion
+    apply P.inclusion
+    apply H
+  pred := by
+    constructor
+    . /- Reflexive -/
+      apply Reflexive.mk
+      intros a
+      apply (TCl (RCl P)).refl
+    . /- Transitive -/
+      apply Transitive.mk
+      intros a b c
+      apply (TCl (RCl P)).trans
+  least := by
+    intros Q inst sub
+    let inst_refl := inst.left
+    let inst_trans := inst.right
+    apply (TCl.close (RCl P)).least inst_trans
+    apply (RCl.close P).least inst_refl
+    exact sub
+
+
+instance rt3_cl_op {A: Type}: ClosureOp RTPred (RTCl3 (A := A)) where
+  close := RTCl3.close
+
+theorem rt3_eq_rt: @RTCl3 = @RTCl := by
+  apply funext
+  intros A
+  let H := @cl_op_unique A RTPred RTCl3 RTCl rt3_cl_op rt_cl_op
+  apply H
+
 
 /--
 Symmetric closure
@@ -267,7 +478,7 @@ instance [P sub_rel R] [Symmetric R]: SCl P sub_rel R where
   inclusion {a b} H := by
     induction H
     case inclusion Hab =>
-      apply P.super
+      apply P.inclusion
       apply Hab
     case symm Hab =>
       apply R.symm
@@ -295,7 +506,7 @@ instance [Symmetric P]: Symmetric (RCl P) where
   symm {a b} H := by
     cases H
     case inclusion Hab =>
-      apply P.super
+      apply P.inclusion
       apply P.symm Hab
     case refl Hab =>
       apply (RCl P).refl
@@ -304,7 +515,7 @@ instance [Symmetric P]: Symmetric (TCl P) where
   symm {a b} H := by
     induction H
     case inclusion Hab =>
-      apply P.super
+      apply P.inclusion
       apply P.symm Hab
     case trans a b c _ _ Hba Hcb =>
       apply (TCl P).trans Hcb Hba
