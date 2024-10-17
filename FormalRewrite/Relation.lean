@@ -497,12 +497,40 @@ theorem scl_ab_or_ba {A} {P: Relation A}: forall {a b: A}, SCl P a b -> P a b �
       left; apply Hba
 
 
-instance [Reflexive P]: Reflexive (SCl P) where
+instance SCl.close {A: Type} (P: Relation A): Closure Symmetric P (SCl P) where
+  inclusion := SubRel.mk SCl.inclusion
+  pred := Symmetric.mk SCl.symm
+  least := by
+    intros Q sub symm
+    apply SubRel.mk
+    intros a b H
+    have Hab_Hba := scl_ab_or_ba H
+    cases Hab_Hba
+    case inl Hab =>
+      apply P.inclusion
+      exact Hab
+    case inr Hba =>
+      apply Q.symm
+      apply P.inclusion
+      apply Hba
+
+instance {A: Type}: ClosureOp Symmetric SCl (A := A) where
+  close := SCl.close
+
+
+instance: Symmetric (SCl P) where
+  symm := SCl.symm
+
+
+/-!
+Similarly, we inspect the equational definitions of an equivalence relation.
+-/
+instance sr_refl [Reflexive P]: Reflexive (SCl P) where
   refl {a}:= by
     apply SCl.inclusion
     apply P.refl
 
-instance [Symmetric P]: Symmetric (RCl P) where
+instance rs_symm [Symmetric P]: Symmetric (RCl P) where
   symm {a b} H := by
     cases H
     case inclusion Hab =>
@@ -511,7 +539,7 @@ instance [Symmetric P]: Symmetric (RCl P) where
     case refl Hab =>
       apply (RCl P).refl
 
-instance [Symmetric P]: Symmetric (TCl P) where
+instance ts_symm [Symmetric P]: Symmetric (TCl P) where
   symm {a b} H := by
     induction H
     case inclusion Hab =>
@@ -566,3 +594,120 @@ example: Not (Transitive (SCl Rel3)) := by
   case inr E => cases E
 
 end CounterExampleOfTransSymm
+
+
+/-!
+Then, we work on the transitive and symmetric closure
+-/
+def TSPred {A: Type}: RelationPred A := fun (P: Relation A) => Transitive P ∧ Symmetric P
+abbrev TSCl {A: Type} (P: Relation A) := TCl (SCl P)
+
+instance TSCl.close {A: Type} (P: Relation A): Closure TSPred P (TSCl P) where
+  inclusion := by
+    let s1 := (TCl.close (SCl P)).inclusion
+    let s2 := (SCl.close P).inclusion
+    apply Relation.trans s2 s1
+  pred := by
+    constructor
+    . /- Transitive -/
+      apply (TCl.close (SCl P)).pred
+    . /- Symmetric -/
+      apply ts_symm
+  least := by
+    intros Q H sub
+    let inst_trans := H.left
+    let inst_symm := H.right
+    apply (TCl.close (SCl P)).least inst_trans
+    apply (SCl.close P).least inst_symm
+    exact sub
+
+/-!
+Then, the equivalence relation
+-/
+def EPred {A: Type} (P: Relation A) := Reflexive P ∧ Transitive P ∧ Symmetric P
+
+/--
+Equivalence Closure
+-/
+inductive ECl (P: Relation A): Relation A where
+  | inclusion: P a b -> ECl P a b
+  | refl: ECl P a a
+  | trans: ECl P a b -> ECl P b c -> ECl P a c
+  | symm: ECl P a b -> ECl P b a
+
+
+instance ECl.close (P: Relation A): Closure EPred P (ECl P) where
+  inclusion := SubRel.mk ECl.inclusion
+  pred := by
+    constructor
+    . /- Reflexive -/
+      apply Reflexive.mk ECl.refl
+    constructor
+    . /- Transitive -/
+      apply Transitive.mk ECl.trans
+    . /- Symmetric -/
+      apply Symmetric.mk ECl.symm
+  least := by
+    intros Q inst sub
+    let inst_refl := inst.left
+    let inst_trans := inst.right.left
+    let inst_symm := inst.right.right
+    apply SubRel.mk
+    intros a b H
+    induction H
+    case inclusion a b Hab =>
+      apply sub.inclusion
+      apply Hab
+    case refl a =>
+      apply Q.refl
+    case trans Hab Hbc =>
+      apply Q.trans Hab Hbc
+    case symm Hab =>
+      apply Q.symm Hab
+
+instance ecl_cl_op {A: Type}: ClosureOp EPred ECl (A := A) where
+  close := ECl.close
+
+
+/-!
+Similarly, we inspect the equivalence between different closures.
+-/
+abbrev ECl2 (P: Relation A) := RCl (TCl (SCl P))
+
+instance ECl2.close (P: Relation A): Closure EPred P (ECl2 P) where
+  inclusion := by
+    apply SubRel.mk
+    intros a b H
+    apply (SCl P).inclusion
+    apply SCl.inclusion
+    apply H
+  pred := by
+    constructor
+    . /- Reflexive -/
+      apply (RCl.close (TCl (SCl P))).pred
+    constructor
+    . /- Transitive -/
+      apply Transitive.mk
+      intros a b c Hab Hbc
+      apply Relation.trans Hab Hbc
+    . /- Symmetric -/
+      apply Symmetric.mk
+      intros a b Hab
+      apply Relation.symm Hab
+  least := by
+    intros Q inst sub
+    let ⟨inst_refl, inst_trans, inst_symm⟩ := inst
+    apply (RCl.close (TCl (SCl P))).least inst_refl
+    apply (TCl.close (SCl P)).least inst_trans
+    apply (SCl.close P).least inst_symm
+    exact sub
+
+
+instance ecl2_cl_op {A: Type}: ClosureOp EPred ECl2 (A := A) where
+  close := ECl2.close
+
+theorem ecl2_eq_ecl: @ECl2 = @ECl := by
+  apply funext
+  intros A
+  let E := @cl_op_unique A EPred ECl2 ECl ecl2_cl_op ecl_cl_op
+  apply E
