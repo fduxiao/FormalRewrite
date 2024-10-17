@@ -124,7 +124,7 @@ abbrev RelationPred (A: Type) := Relation A -> Prop
 The closure fo each type is clear.
 -/
 class Closure {A: Type} (Pred: outParam (RelationPred A)) (P: outParam (Relation A)) (C: Relation A) where
-  inclusion: P sub_rel C
+  sub: P sub_rel C
   pred: Pred C
   least: forall {Q: Relation A}, Pred Q -> (P sub_rel Q) -> C sub_rel Q
 
@@ -133,13 +133,13 @@ class Closure {A: Type} (Pred: outParam (RelationPred A)) (P: outParam (Relation
 We instantly have the following.
 -/
 instance {A: Type} {P C: Relation A} {Pred: RelationPred A} [inst: Closure Pred P C]:
-  P sub_rel C := inst.inclusion
+  P sub_rel C := inst.sub
 
 instance cl_cl_sub {A: Type} {Pred: RelationPred A} {P: Relation A} {C1 C2: Relation A}
   [inst1: Closure Pred P C1] [inst2: Closure Pred P C2]: C1 sub_rel C2 where
     inclusion := by
       intros a b
-      let sub := @inst1.least C2 inst2.pred inst2.inclusion
+      let sub := @inst1.least C2 inst2.pred inst2.sub
       apply sub.inclusion
 
 
@@ -159,7 +159,7 @@ We can also define a closure operator.
 class ClosureOp {A: Type} (Pred: outParam (RelationPred A)) (Cl: outParam (RelationOp A)) where
   close (P: Relation A): Closure Pred P (Cl P)
   closed {P: Relation A} := close P
-  inclusion {P: Relation A} := closed.inclusion (P := P)
+  sub {P: Relation A} := closed.sub (P := P)
   pred {P: Relation A} := closed.pred (P := P)
   least {P Q: Relation A} := closed.least (P := P) (Q := Q)
 
@@ -178,19 +178,19 @@ instance {A: Type} {Pred: RelationPred A} (Cl: RelationOp A) [inst: ClosureOp Pr
 
 
 instance {A: Type} {Pred: RelationPred A} {Cl: RelationOp A} [inst: ClosureOp Pred Cl] {P: Relation A}:
-  P sub_rel (Cl P) := (inst.closed).inclusion
+  P sub_rel (Cl P) := (inst.closed).sub
 
 instance cl_op_cl_op_sub {A: Type} {Pred: RelationPred A} {C1 C2: RelationOp A}
   [inst1: ClosureOp Pred C1] [inst2: ClosureOp Pred C2] {P: Relation A}: C1 P sub_rel C2 P where
     inclusion := by
       intros a b
-      let sub := @inst1.least P (C2 P) inst2.pred inst2.inclusion
+      let sub := @inst1.least P (C2 P) inst2.pred inst2.sub
       apply sub.inclusion
 
 instance cl_mono {A: Type} {Pred: RelationPred A} {Cl: RelationOp A} [inst: ClosureOp Pred Cl]
   {P Q: Relation A} [r1: P sub_rel Q]: Cl P sub_rel Cl Q where
   inclusion := by
-    have r2: Q sub_rel Cl Q := inst.inclusion
+    have r2: Q sub_rel Cl Q := inst.sub
     have r3: P sub_rel Cl Q := Relation.trans r1 r2
     let H := @inst.least P (Cl Q) inst.pred r3
     intros a b
@@ -241,7 +241,7 @@ theorem cl_cl_is_cl {Cl: RelationOp A} [inst: ClosureOp Pred Cl]: Cl (Cl P) = Cl
   apply rel_eq
   apply sub_rel_equiv
   . apply cl_cl_sub_cl
-  . apply @inst.inclusion
+  . apply @inst.sub
 end Closure
 
 
@@ -253,7 +253,7 @@ inductive RCl (P: Relation A): Relation A where
   | refl: RCl P a a
 
 instance RCl.close {A: Type} (P: Relation A): Closure Reflexive P (RCl P) where
-  inclusion := SubRel.mk RCl.inclusion
+  sub := SubRel.mk RCl.inclusion
   pred := Reflexive.mk RCl.refl
   least := by
     intros Q inst sub
@@ -293,7 +293,7 @@ inductive TCl (P: Relation A): Relation A where
   | trans: TCl P a b -> TCl P b c -> TCl P a c
 
 instance TCl.close {A: Type} (P: Relation A): Closure Transitive P (TCl P) where
-  inclusion := SubRel.mk TCl.inclusion
+  sub := SubRel.mk TCl.inclusion
   pred := Transitive.mk TCl.trans
   least := by
     intros Q sub inst
@@ -352,7 +352,7 @@ inductive RTCl (P: Relation A): Relation A where
 
 
 instance RTCl.close (P: Relation A): Closure RTPred P (RTCl P) where
-  inclusion := SubRel.mk RTCl.inclusion
+  sub := SubRel.mk RTCl.inclusion
   pred := by
     constructor
     . apply Reflexive.mk
@@ -388,7 +388,7 @@ Then we prove the equivalence between RTCl P, RCl (TCl P) and TCl (RCl P)
 abbrev RTCl2 (P: Relation A) := RCl (TCl P)
 
 instance RTCl2.close (P: Relation A): Closure RTPred P (RTCl2 P) where
-  inclusion := by
+  sub := by
     apply SubRel.mk
     intros a b H
     apply (TCl P).inclusion
@@ -426,7 +426,7 @@ theorem rt2_eq_rt: @RTCl2 = @RTCl := by
 abbrev RTCl3 (P: Relation A) := TCl (RCl P)
 
 instance RTCl3.close (P: Relation A): Closure RTPred P (RTCl3 P) where
-  inclusion := by
+  sub := by
     apply SubRel.mk
     intros a b H
     apply (TCl P).inclusion
@@ -498,7 +498,7 @@ theorem scl_ab_or_ba {A} {P: Relation A}: forall {a b: A}, SCl P a b -> P a b âˆ
 
 
 instance SCl.close {A: Type} (P: Relation A): Closure Symmetric P (SCl P) where
-  inclusion := SubRel.mk SCl.inclusion
+  sub := SubRel.mk SCl.inclusion
   pred := Symmetric.mk SCl.symm
   least := by
     intros Q sub symm
@@ -603,9 +603,9 @@ def TSPred {A: Type}: RelationPred A := fun (P: Relation A) => Transitive P âˆ§ 
 abbrev TSCl {A: Type} (P: Relation A) := TCl (SCl P)
 
 instance TSCl.close {A: Type} (P: Relation A): Closure TSPred P (TSCl P) where
-  inclusion := by
-    let s1 := (TCl.close (SCl P)).inclusion
-    let s2 := (SCl.close P).inclusion
+  sub := by
+    let s1 := (TCl.close (SCl P)).sub
+    let s2 := (SCl.close P).sub
     apply Relation.trans s2 s1
   pred := by
     constructor
@@ -637,7 +637,7 @@ inductive ECl (P: Relation A): Relation A where
 
 
 instance ECl.close (P: Relation A): Closure EPred P (ECl P) where
-  inclusion := SubRel.mk ECl.inclusion
+  sub := SubRel.mk ECl.inclusion
   pred := by
     constructor
     . /- Reflexive -/
@@ -675,7 +675,7 @@ Similarly, we inspect the equivalence between different closures.
 abbrev ECl2 (P: Relation A) := RCl (TCl (SCl P))
 
 instance ECl2.close (P: Relation A): Closure EPred P (ECl2 P) where
-  inclusion := by
+  sub := by
     apply SubRel.mk
     intros a b H
     apply (SCl P).inclusion
